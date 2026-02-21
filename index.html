@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Моніторинг довкілля — Затишшя (Mobile)</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --brand-1: #11998e;
+      --brand-2: #38ef7d;
+      --accent: #1d976c;
+      --radius: 14px;
+      --shadow: 0 8px 24px rgba(0,0,0,0.08);
+      --shadow-sm: 0 2px 10px rgba(0,0,0,0.06);
+      --safe-bottom: env(safe-area-inset-bottom);
+    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color: transparent}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display:flex;flex-direction:column;
+    }
+    header{
+      background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
+      color:#fff; padding: 12px 12px 10px; text-align:center;
+      position: sticky; top: 0; z-index: 5; box-shadow: var(--shadow-sm);
+    }
+    header h1{margin:0 0 4px; font-size: 18px}
+    .loc-row{display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap}
+    #locName{font-weight:700}
+    #btnChangeLoc{border:none; background:#fff; color:#0b5138; padding:6px 10px; border-radius:999px; font-size:12px; box-shadow: var(--shadow-sm)}
+    #lastUpdate{font-size:12px; opacity:.95; margin-top:6px}
+
+    .container{padding: 12px 12px calc(78px + var(--safe-bottom));}
+
+    /* Tab contents */
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+
+    /* Cards */
+    .cards{display:grid; gap:10px; grid-template-columns: 1fr;}
+    .card{background:var(--card); border-radius: var(--radius); padding:12px; box-shadow: var(--shadow-sm);}
+    .metric-card{cursor:pointer; border:1px solid transparent}
+    .metric-card.selected{outline:2px solid #34d399; background:#eaffe7}
+    .label{color:var(--muted); font-size:13px}
+    .value{font-size:20px; font-weight:700; margin-top:4px}
+
+    .good{color:#16a34a}.medium{color:#eab308}.bad{color:#ef4444}
+
+    .panel-title{font-weight:700; margin: 6px 0 10px; font-size:16px}
+    .hint{color:var(--muted); font-size:12px; margin-top:6px}
+
+    /* Chart */
+    .chart-box{background:var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px}
+    .chart-head{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:4px}
+    .chart-title{font-weight:700}
+    .chart-sub{color:var(--muted); font-size:12px}
+    canvas{width:100%; height:280px !important}
+
+    /* Forecast vertical list */
+    .v-list{display:grid; gap:10px; grid-template-columns:1fr}
+    .day-card{display:grid; gap:6px; text-align:center}
+    .wx-icon{width:52px; height:52px; justify-self:center}
+    .temp-range{font-weight:800; font-size:18px}
+    .meta{display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px; color:var(--muted)}
+
+    /* Map */
+    #map{height: 360px; border-radius: var(--radius); box-shadow: var(--shadow-sm); position: relative}
+
+    /* Pick mode UI */
+    .pick-overlay{position:absolute; left:8px; top:8px; right:8px; display:flex; align-items:center; justify-content:center; gap:8px; padding:8px 10px; background:rgba(255,255,255,.95); border-radius:12px; box-shadow: var(--shadow-sm); font-size:13px}
+    .pick-overlay.hidden{display:none}
+    .crosshair{position:absolute; left:50%; top:50%; width:28px; height:28px; transform:translate(-50%,-50%); pointer-events:none; border:2px solid #1d976c; border-radius:50%}
+    .pick-controls{position:absolute; left:8px; right:8px; bottom:8px; display:flex; gap:8px;}
+    .pick-controls.hidden{display:none}
+    .btn{border:none; background:#e8f6ef; color:#0b5138; padding:10px 12px; border-radius:10px; font-weight:600; flex:1}
+    .btn.primary{background:#1d976c; color:#fff}
+    .btn.danger{background:#fee2e2; color:#991b1b}
+
+    /* Bottom Tabs */
+    .bottom-tabs{ position: fixed; left:0; right:0; bottom:0; background:#fff; display:flex; justify-content:space-around; gap:2px; padding: 6px 8px calc(6px + var(--safe-bottom)); box-shadow: 0 -6px 18px rgba(0,0,0,0.08); z-index: 10; }
+    .tab-btn{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:8px 4px; border:none; background:transparent; border-radius:12px; cursor:pointer; font-size:11px; color:#0b5138; min-height: 44px; }
+    .tab-btn .ico{font-size:18px}
+    .tab-btn.active{background:#e8f6ef; color:var(--accent)}
+
+    /* Toast */
+    .toast{position:fixed; left:50%; bottom:calc(76px + var(--safe-bottom)); transform:translateX(-50%); background:#111827; color:#fff; padding:10px 14px; border-radius:10px; font-size:13px; box-shadow: var(--shadow-sm); z-index:40; opacity:0; pointer-events:none; transition:opacity .2s}
+    .toast.show{opacity:.95}
+
+    @media (min-width: 640px){ /* small tablets */
+      .cards{grid-template-columns: repeat(2, 1fr)}
+      .v-list{grid-template-columns: repeat(2, 1fr)}
+      #map{height: 420px}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🌍 Моніторинг — <span id="locName">Затишшя</span></h1>
+    <div class="loc-row">
+      <button id="btnChangeLoc">Змінити локацію</button>
+    </div>
+    <div id="lastUpdate">Станом на: —</div>
+  </header>
+
+  <div class="container">
+    <!-- ====== TAB: Panel ====== -->
+    <section id="tab-panel" class="tab-content active" role="tabpanel">
+      <div class="panel-title">Зведення (поточні дані)</div>
+      <div id="panel-cards" class="cards">
+        <div class="card">Завантаження…</div>
+      </div>
+      <div class="hint">Порада: клацни по картках на вкладках «Погода» та «Якість повітря», щоб перемкнути графік.</div>
+    </section>
+
+    <!-- ====== TAB: Forecast (vertical) ====== -->
+    <section id="tab-forecast" class="tab-content" role="tabpanel">
+      <div class="panel-title">Прогноз на найближчі дні</div>
+      <div id="forecast-cards" class="v-list">
+        <div class="card day-card">Формую денні зведення…</div>
+      </div>
+      <div class="hint">Без підписки — до <b>5 днів</b> із кроком 3 год (агреговано).</div>
+    </section>
+
+    <!-- ====== TAB: Weather ====== -->
+    <section id="tab-weather" class="tab-content" role="tabpanel">
+      <div class="panel-title">Поточна погода</div>
+      <div id="weather-cards" class="cards">
+        <div class="card">Завантаження…</div>
+      </div>
+      <div class="chart-box" style="margin-top:10px">
+        <div class="chart-head">
+          <div class="chart-title" id="weatherChartTitle">Графік: —</div>
+          <div class="chart-sub" id="weatherChartSub">Клацніть по картці вище</div>
+        </div>
+        <canvas id="weatherChart"></canvas>
+      </div>
+    </section>
+
+    <!-- ====== TAB: Air ====== -->
+    <section id="tab-air" class="tab-content" role="tabpanel">
+      <div class="panel-title">Якість повітря</div>
+      <div id="air-cards" class="cards">
+        <div class="card">Завантаження…</div>
+      </div>
+      <div class="chart-box" style="margin-top:10px">
+        <div class="chart-head">
+          <div class="chart-title" id="airChartTitle">Графік: —</div>
+          <div class="chart-sub" id="airChartSub">Клацніть по картці вище</div>
+        </div>
+        <canvas id="airChart"></canvas>
+      </div>
+    </section>
+
+    <!-- ====== TAB: Map ====== -->
+    <section id="tab-map" class="tab-content" role="tabpanel">
+      <div class="panel-title">Локація: <span id="locNameMap">Затишшя</span></div>
+      <div id="map">
+        <!-- pick mode UI -->
+        <div id="pickOverlay" class="pick-overlay hidden">Режим вибору локації: пересуньте карту так, щоб потрібна точка була під прицілом</div>
+        <div id="crosshair" class="crosshair" style="display:none"></div>
+        <div id="pickControls" class="pick-controls hidden">
+          <button id="btnPickCancel" class="btn danger">✖ Скасувати</button>
+          <button id="btnPickConfirm" class="btn primary">✅ Підтвердити</button>
+        </div>
+      </div>
+      <div class="hint">Порада: торкнися мапи, щоб підвантажити тайли; в режимі вибору локації працюйте центруванням карти.</div>
+    </section>
+  </div>
+
+  <!-- Bottom tab bar -->
+  <nav class="bottom-tabs" role="tablist">
+    <button class="tab-btn active" data-tab="panel"><span class="ico">📊</span>Панель</button>
+    <button class="tab-btn" data-tab="forecast"><span class="ico">🗓️</span>Прогноз</button>
+    <button class="tab-btn" data-tab="weather"><span class="ico">🌦️</span>Погода</button>
+    <button class="tab-btn" data-tab="air"><span class="ico">🧪</span>Повітря</button>
+    <button class="tab-btn" data-tab="map"><span class="ico">🗺️</span>Мапа</button>
+  </nav>
+
+  <div id="toast" class="toast">Локацію оновлено</div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ---- STATE & CONFIG ----
+    let lat = 50.025568493528525;
+    let lon = 25.551977585581156;
+    let placeName = 'Затишшя';
+    const API_KEY = "c91234ddc97f9cf6bb58824bdac07bf3";
+
+    // restore from localStorage
+    try { const saved = localStorage.getItem('envmon_loc'); if (saved) { const obj = JSON.parse(saved); if (typeof obj.lat === 'number' && typeof obj.lon === 'number') { lat = obj.lat; lon = obj.lon; placeName = obj.name || placeName; } } } catch(_){}
+
+    const locNameEl = document.getElementById('locName');
+    const locNameMapEl = document.getElementById('locNameMap');
+    function syncLocTitle(){ locNameEl.textContent = placeName; locNameMapEl.textContent = placeName; }
+    syncLocTitle();
+
+    const lastUpdateDiv = document.getElementById('lastUpdate');
+    const panelCards = document.getElementById('panel-cards');
+    const weatherCards = document.getElementById('weather-cards');
+    const airCards = document.getElementById('air-cards');
+    const forecastCards = document.getElementById('forecast-cards');
+
+    const weatherChartTitle = document.getElementById('weatherChartTitle');
+    const weatherChartSub = document.getElementById('weatherChartSub');
+    const airChartTitle = document.getElementById('airChartTitle');
+    const airChartSub = document.getElementById('airChartSub');
+
+    let weatherChartInstance = null;
+    let airChartInstance = null;
+
+    // caches
+    let weatherForecastCache = null;
+    let airForecastCache = null;
+
+    function updateTime(){ const now = new Date(); lastUpdateDiv.innerHTML = 'Станом на: <b>' + now.toLocaleString('uk-UA') + '</b>'; }
+    function aqiText(aqi){ return ["", "Добре", "Нормально", "Середнє", "Погано", "Дуже погано"][aqi] || '—'; }
+    function aqiClass(aqi){ if (aqi<=2) return 'good'; if (aqi===3) return 'medium'; return 'bad'; }
+
+    const fmtHour = ts => new Date(ts).toLocaleTimeString('uk-UA',{hour:'2-digit'});
+    const fmtHourMin = ts => new Date(ts).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+    const safe = v => (v ?? '—');
+    const asRGBA = (hex,a)=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r},${g},${b},${a})`;};
+
+    // Tabs (bottom bar)
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabs = {
+      panel: document.getElementById('tab-panel'),
+      forecast: document.getElementById('tab-forecast'),
+      weather: document.getElementById('tab-weather'),
+      air: document.getElementById('tab-air'),
+      map: document.getElementById('tab-map')
+    };
+
+    function switchToTab(id){
+      tabButtons.forEach(b=>b.classList.remove('active'));
+      Object.values(tabs).forEach(el=>el.classList.remove('active'));
+      const btn = document.querySelector(`.tab-btn[data-tab="${id}"]`);
+      if(btn) btn.classList.add('active');
+      tabs[id].classList.add('active');
+      if(id==='forecast') ensureForecastLoaded();
+      if(id==='weather') ensureWeatherLoaded();
+      if(id==='air') ensureAirLoaded();
+      if(id==='map') ensureMapLoaded();
+    }
+
+    tabButtons.forEach(btn=>{ btn.addEventListener('click',()=> switchToTab(btn.dataset.tab)); });
+
+    // API helpers
+    async function fetchJSON(url){ const r = await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
+    async function getWeatherNow(){ const url=`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&lang=uk&appid=${API_KEY}`; return await fetchJSON(url); }
+    async function getWeatherForecast(){ if(weatherForecastCache) return weatherForecastCache; const url=`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&lang=uk&appid=${API_KEY}`; weatherForecastCache = await fetchJSON(url); return weatherForecastCache; }
+    async function getAirNow(){ const url=`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`; return await fetchJSON(url); }
+    async function getAirForecast(){ if(airForecastCache) return airForecastCache; const url=`https://api.openweathermap.org/data/2.5/air_pollution/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}`; airForecastCache = await fetchJSON(url); return airForecastCache; }
+
+    // Metrics
+    const WEATHER_METRICS = {
+      temp:       { label: 'Температура',      color:'#ef4444', unit:'°C', extractor:i=>i.main?.temp },
+      feels_like: { label: 'Відчувається',     color:'#f97316', unit:'°C', extractor:i=>i.main?.feels_like },
+      humidity:   { label: 'Вологість (%)',    color:'#3b82f6', unit:'%',  extractor:i=>i.main?.humidity },
+      pressure:   { label: 'Тиск (гПа)',       color:'#6366f1', unit:'гПа', extractor:i=>i.main?.pressure },
+      wind:       { label: 'Вітер (м/с)',      color:'#10b981', unit:'м/с', extractor:i=>i.wind?.speed },
+      clouds:     { label: 'Хмарність (%)',    color:'#6b7280', unit:'%',  extractor:i=>i.clouds?.all },
+    };
+    const AIR_METRICS = {
+      aqi:   { label: 'AQI (1–5)',     color:'#f59e0b', unit:'',      extractor:i=>i.main?.aqi, stepped:true, yMin:0, yMax:5 },
+      pm2_5: { label: 'PM2.5 (μг/м³)', color:'#8b5cf6', unit:'μг/м³', extractor:i=>i.components?.pm2_5 },
+      pm10:  { label: 'PM10 (μг/м³)',  color:'#10b981', unit:'μг/м³', extractor:i=>i.components?.pm10 },
+      no2:   { label: 'NO₂ (μг/м³)',   color:'#ef4444', unit:'μг/м³', extractor:i=>i.components?.no2 },
+      o3:    { label: 'O₃ (μг/м³)',    color:'#06b6d4', unit:'μг/м³', extractor:i=>i.components?.o3 },
+      so2:   { label: 'SO₂ (μг/м³)',   color:'#a3e635', unit:'μг/м³', extractor:i=>i.components?.so2 },
+      co:    { label: 'CO (μг/м³)',    color:'#f43f5e', unit:'μг/м³', extractor:i=>i.components?.co },
+      nh3:   { label: 'NH₃ (μг/м³)',   color:'#14b8a6', unit:'μг/м³', extractor:i=>i.components?.nh3 },
+    };
+
+    // Panel
+    async function loadPanel(){
+      try{
+        const [wNow, aNow] = await Promise.all([getWeatherNow(), getAirNow()]);
+        const sunrise = new Date(wNow.sys.sunrise*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+        const sunset  = new Date(wNow.sys.sunset*1000 ).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+        const aqi = aNow?.list?.[0]?.main?.aqi ?? 0; const c = aNow?.list?.[0]?.components ?? {};
+        panelCards.innerHTML = `
+          <div class=\"card\"><div class=\"label\">🌡 Температура</div><div class=\"value\">${safe(wNow.main?.temp)} °C • відч: ${safe(wNow.main?.feels_like)} °C</div></div>
+          <div class=\"card\"><div class=\"label\">💧 Вологість</div><div class=\"value\">${safe(wNow.main?.humidity)} %</div></div>
+          <div class=\"card\"><div class=\"label\">🌬 Вітер</div><div class=\"value\">${safe(wNow.wind?.speed)} м/с</div></div>
+          <div class=\"card\"><div class=\"label\">🔽 Тиск</div><div class=\"value\">${safe(wNow.main?.pressure)} гПа</div></div>
+          <div class=\"card\"><div class=\"label\">🌤 Опис</div><div class=\"value\">${safe(wNow.weather?.[0]?.description)}</div></div>
+          <div class=\"card\"><div class=\"label\">🌅 Схід / Захід</div><div class=\"value\">${sunrise} / ${sunset}</div></div>
+          <div class=\"card ${aqiClass(aqi)}\"><div class=\"label\">🟢 Індекс якості повітря</div><div class=\"value\">${aqiText(aqi)} (${aqi})</div></div>
+          <div class=\"card\"><div class=\"label\">PM2.5</div><div class=\"value\">${safe(c.pm2_5)} μг/м³</div></div>
+          <div class=\"card\"><div class=\"label\">PM10</div><div class=\"value\">${safe(c.pm10)} μг/м³</div></div>`;
+        updateTime();
+      }catch(e){ panelCards.innerHTML = `<div class=\"card\">Помилка: ${e.message}</div>`; }
+    }
+
+    // Weather
+    let weatherLoaded=false;
+    async function ensureWeatherLoaded(){ if(weatherLoaded) return; weatherLoaded=true; await loadWeatherCards(); activateMetricCard('weather','temp'); }
+    async function loadWeatherCards(){
+      try{
+        const w = await getWeatherNow();
+        const sunrise = new Date(w.sys.sunrise*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+        const sunset  = new Date(w.sys.sunset*1000 ).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+        weatherCards.innerHTML = `
+          <div class=\"card metric-card\" data-group=\"weather\" data-metric=\"temp\"><div class=\"label\">🌡 Температура</div><div class=\"value\">${safe(w.main?.temp)} °C • відч: ${safe(w.main?.feels_like)} °C</div></div>
+          <div class=\"card metric-card\" data-group=\"weather\" data-metric=\"humidity\"><div class=\"label\">💧 Вологість</div><div class=\"value\">${safe(w.main?.humidity)} %</div></div>
+          <div class=\"card metric-card\" data-group=\"weather\" data-metric=\"pressure\"><div class=\"label\">🔽 Тиск</div><div class=\"value\">${safe(w.main?.pressure)} гПа</div></div>
+          <div class=\"card metric-card\" data-group=\"weather\" data-metric=\"wind\"><div class=\"label\">🌬 Вітер</div><div class=\"value\">${safe(w.wind?.speed)} м/с</div></div>
+          <div class=\"card metric-card\" data-group=\"weather\" data-metric=\"clouds\"><div class=\"label\">☁️ Хмарність</div><div class=\"value\">${safe(w.clouds?.all)} %</div></div>
+          <div class=\"card\"><div class=\"label\">🌅 Схід / Захід</div><div class=\"value\">${sunrise} / ${sunset}</div></div>`;
+        attachMetricCardClicks();
+      }catch(e){ weatherCards.innerHTML = `<div class=\"card\">Помилка: ${e.message}</div>`; }
+    }
+
+    async function renderWeatherMetric(metricKey){
+      const ctx = document.getElementById('weatherChart').getContext('2d');
+      try{
+        const f = await getWeatherForecast();
+        const slice = f.list.slice(0,8);
+        const labels = slice.map(i=>fmtHour(i.dt*1000));
+        if(weatherChartInstance) weatherChartInstance.destroy();
+        if(metricKey==='temp'){
+          const temps = slice.map(i=>WEATHER_METRICS.temp.extractor(i));
+          const feels = slice.map(i=>WEATHER_METRICS.feels_like.extractor(i));
+          weatherChartInstance = new Chart(ctx,{ type:'line', data:{labels,datasets:[ {label:'Температура (°C)', data:temps, borderColor:'#ef4444', backgroundColor:asRGBA('#ef4444',0.12), tension:.35, pointRadius:3, pointHoverRadius:5, fill:false}, {label:'Відчувається (°C)', data:feels, borderColor:'#f97316', backgroundColor:asRGBA('#f97316',0.10), tension:.35, pointRadius:3, pointHoverRadius:5, fill:false} ]}, options:{responsive:true, interaction:{mode:'index',intersect:false}, plugins:{legend:{position:'top'}}, scales:{y:{title:{display:true,text:'°C'}, grace:'10%'}, x:{grid:{display:false}}} }});
+          weatherChartTitle.textContent = 'Графік: Температура & Відчувається';
+          weatherChartSub.textContent = 'Найближчі ~24 години (крок 3 год)';
+        } else {
+          const meta = WEATHER_METRICS[metricKey]; if(!meta) return;
+          const data = slice.map(i=>meta.extractor(i)).map(v=>v!=null?+v:null);
+          weatherChartInstance = new Chart(ctx,{ type:'line', data:{labels, datasets:[{label:meta.label, data, borderColor:meta.color, backgroundColor:asRGBA(meta.color,0.18), pointRadius:3, pointHoverRadius:5, tension:.35, fill:true, spanGaps:true}]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{title:{display:true,text:meta.unit||''}, ticks:{callback:(v)=>meta.unit?`${v} ${meta.unit}`:v}, grace:'10%'}} }});
+          weatherChartTitle.textContent = 'Графік: '+meta.label;
+          weatherChartSub.textContent = 'Найближчі ~24 години (крок 3 год)';
+        }
+      }catch(e){ weatherChartTitle.textContent='Графік: помилка'; weatherChartSub.textContent=e.message; }
+    }
+
+    // Forecast daily aggregation (vertical)
+    let forecastLoaded=false;
+    async function ensureForecastLoaded(){ if(forecastLoaded) return; forecastLoaded=true; await loadForecastCards(); }
+
+    function ymdKeyFromUTC(dtSec, tzOffsetSec){ const local=new Date((dtSec+tzOffsetSec)*1000); const y=local.getUTCFullYear(); const m=String(local.getUTCMonth()+1).padStart(2,'0'); const d=String(local.getUTCDate()).padStart(2,'0'); return `${y}-${m}-${d}`; }
+    function prettyDayFromUTC(dtSec, tzOffsetSec){ const local=new Date((dtSec+tzOffsetSec)*1000); return local.toLocaleDateString('uk-UA',{weekday:'short', day:'2-digit', month:'short'}); }
+
+    async function loadForecastCards(){
+      try{
+        const f = await getWeatherForecast(); const tzOffset = f.city?.timezone || 0;
+        const byDay = new Map();
+        f.list.forEach(item=>{ const key=ymdKeyFromUTC(item.dt,tzOffset); (byDay.get(key)||byDay.set(key,[]).get(key)).push(item); });
+        const keys = Array.from(byDay.keys()).sort().slice(0,5);
+        const days = keys.map(k=>{
+          const items = byDay.get(k);
+          let pick=items[0], best=1e9; items.forEach(i=>{ const h=new Date((i.dt+tzOffset)*1000).getUTCHours(); const d=Math.abs(h-12); if(d<best){best=d; pick=i;} });
+          const tmin = Math.min(...items.map(i=>i.main?.temp_min ?? i.main?.temp));
+          const tmax = Math.max(...items.map(i=>i.main?.temp_max ?? i.main?.temp));
+          const humAvg = Math.round(items.reduce((s,i)=>s+(i.main?.humidity??0),0)/items.length);
+          const windMax = Math.max(...items.map(i=>i.wind?.speed ?? 0));
+          const popMax = Math.round(Math.max(...items.map(i=>i.pop ?? 0))*100);
+          const rainSum = items.reduce((s,i)=> s + (i.rain?.['3h'] ?? 0), 0);
+          const snowSum = items.reduce((s,i)=> s + (i.snow?.['3h'] ?? 0), 0);
+          const precip = +(rainSum+snowSum).toFixed(1);
+          const icon = pick.weather?.[0]?.icon || '01d';
+          const desc = pick.weather?.[0]?.description || '';
+          const pretty = prettyDayFromUTC(items[0].dt, tzOffset);
+          return { pretty, icon, desc, tmin:Math.round(tmin), tmax:Math.round(tmax), humAvg, windMax:+windMax.toFixed(1), popMax, precip };
+        });
+        forecastCards.innerHTML = days.map(d=>`
+          <div class=\"card day-card\" title=\"${d.desc}\"> <div class=\"value\">${d.pretty}</div> <img class=\"wx-icon\" alt=\"ico\" src=\"https://openweathermap.org/img/wn/${d.icon}@2x.png\"/> <div class=\"temp-range\">${d.tmax}° / ${d.tmin}°C</div> <div style=\"text-transform:capitalize; color:var(--muted); font-size:12px;\">${d.desc}</div> <div class=\"meta\"> <div>💧 ${d.humAvg}%</div> <div>🌬 ${d.windMax} м/с</div> <div>🌧️ ${d.popMax}%</div> <div>☔ ${d.precip} мм</div> </div> </div>`).join('');
+      }catch(e){ forecastCards.innerHTML = `<div class=\"card day-card\">Не вдалося завантажити прогноз: ${e.message}</div>`; }
+    }
+
+    // Air
+    let airLoaded=false; 
+    async function ensureAirLoaded(){ if(airLoaded) return; airLoaded=true; await loadAirCards(); activateMetricCard('air','pm2_5'); }
+    async function loadAirCards(){
+      try{
+        const d = await getAirNow(); const aqi = d?.list?.[0]?.main?.aqi ?? 0; const c = d?.list?.[0]?.components ?? {};
+        airCards.innerHTML = `
+          <div class=\"card metric-card ${aqiClass(aqi)}\" data-group=\"air\" data-metric=\"aqi\"><div class=\"label\">🟢 Індекс якості повітря</div><div class=\"value\">${aqiText(aqi)} (${aqi})</div></div>
+          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"pm2_5\"><div class=\"label\">PM2.5</div><div class=\"value\">${safe(c.pm2_5)} μг/м³</div></div>
+          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"pm10\"><div class=\"label\">PM10</div><div class=\"value\">${safe(c.pm10)} μг/м³</div></div>
+          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"no2\"><div class=\"label\">NO₂</div><div class=\"value\">${safe(c.no2)} μг/м³</div></div>
+          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"o3\"><div class=\"label\">O₃</div><div class=\"value\">${safe(c.o3)} μг/м³</div></div>
+          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"so2\"><div class=\"label\">SO₂</div><div class=\"value\">${safe(c.so2)} μг/м³</div></div>
+          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"co\"><div class=\"label\">CO</div><div class=\"value\">${safe(c.co)} μг/м³</div></div>
+          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"nh3\"><div class=\"label\">NH₃</div><div class=\"value\">${safe(c.nh3)} μг/м³</div></div>`;
+        attachMetricCardClicks();
+      }catch(e){ airCards.innerHTML = `<div class=\"card\">Помилка: ${e.message}</div>`; }
+    }
+
+    async function renderAirMetric(metricKey){
+      const meta = AIR_METRICS[metricKey]; if(!meta) return;
+      const ctx = document.getElementById('airChart').getContext('2d');
+      try{
+        const f = await getAirForecast(); const slice = (f.list||[]).slice(0,24);
+        const labels = slice.map(i=>fmtHourMin(i.dt*1000));
+        const data = slice.map(i=>meta.extractor(i)).map(v=>v!=null?+v:null);
+        if(airChartInstance) airChartInstance.destroy();
+        airChartInstance = new Chart(ctx,{ type:'line', data:{labels, datasets:[{label:meta.label, data, borderColor:meta.color, backgroundColor:asRGBA(meta.color,0.18), pointRadius:3, pointHoverRadius:5, tension: meta.stepped?0:.35, fill:true, spanGaps:true, stepped: !!meta.stepped}]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{title:{display:true,text:meta.unit||''}, ticks:{callback:(v)=>meta.unit?`${v} ${meta.unit}`:v}, suggestedMin: meta.yMin ?? undefined, suggestedMax: meta.yMax ?? undefined, grace:'10%'}} }});
+        airChartTitle.textContent = 'Графік: '+meta.label; airChartSub.textContent = 'Найближчі 24 години (щогодини)';
+      }catch(e){ airChartTitle.textContent='Графік: помилка'; airChartSub.textContent=e.message; }
+    }
+
+    // Clicks binding
+    function attachMetricCardClicks(){ document.querySelectorAll('.metric-card').forEach(card=>{ card.addEventListener('click',()=>{ const group = card.getAttribute('data-group'); const metric = card.getAttribute('data-metric'); activateMetricCard(group, metric); }); }); }
+    function activateMetricCard(group, metric){ document.querySelectorAll(`.metric-card[data-group="${group}"]`).forEach(c=>c.classList.remove('selected')); const current = document.querySelector(`.metric-card[data-group="${group}"][data-metric="${metric}"]`); if(current) current.classList.add('selected'); if(group==='weather') renderWeatherMetric(metric); if(group==='air') renderAirMetric(metric); }
+
+    // Map lazy init + PICK MODE (center crosshair)
+    let mapInstance=null, mapInitialized=false, mainMarker=null, picking=false;
+    const pickOverlay = document.getElementById('pickOverlay');
+    const crosshair = document.getElementById('crosshair');
+    const pickControls = document.getElementById('pickControls');
+    const btnPickConfirm = document.getElementById('btnPickConfirm');
+    const btnPickCancel = document.getElementById('btnPickCancel');
+
+    function ensureMapLoaded(){
+      if(!mapInitialized){
+        mapInitialized=true; mapInstance = L.map('map').setView([lat, lon], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(mapInstance);
+        mainMarker = L.marker([lat,lon]).addTo(mapInstance).bindPopup(placeName).openPopup();
+      }
+      requestAnimationFrame(()=>{ mapInstance.invalidateSize(); setTimeout(()=>mapInstance.invalidateSize(),120); });
+    }
+
+    function refreshMap(){ if(mapInitialized){ mapInstance.setView([lat,lon]); if(mainMarker){ mainMarker.setLatLng([lat,lon]).setPopupContent(placeName).openPopup(); } } }
+
+    function enterPickMode(){
+      if(!mapInitialized) ensureMapLoaded();
+      picking = true; pickOverlay.classList.remove('hidden'); pickControls.classList.remove('hidden'); crosshair.style.display='block';
+      if(mainMarker){ mainMarker.remove(); mainMarker=null; }
+    }
+    function exitPickMode(){ picking=false; pickOverlay.classList.add('hidden'); pickControls.classList.add('hidden'); crosshair.style.display='none'; if(!mainMarker){ mainMarker = L.marker([lat,lon]).addTo(mapInstance).bindPopup(placeName); }
+      // show updated marker
+      refreshMap();
+    }
+
+    btnPickConfirm.addEventListener('click', ()=>{
+      if(!mapInstance) return; const center = mapInstance.getCenter(); setLocation(center.lat, center.lng, 'Вибрана точка'); showToast('Локацію оновлено'); exitPickMode(); });
+    btnPickCancel.addEventListener('click', ()=>{ exitPickMode(); });
+
+    // Header button → jump to map and enter pick mode
+    document.getElementById('btnChangeLoc').addEventListener('click', ()=>{ switchToTab('map'); ensureMapLoaded(); enterPickMode(); });
+
+    function setLocation(lt, lg, label){ lat = lt; lon = lg; if(label) placeName = label; syncLocTitle(); localStorage.setItem('envmon_loc', JSON.stringify({lat,lon,name:placeName})); weatherForecastCache = null; airForecastCache = null; forecastLoaded = false; loadPanel(); if(weatherLoaded){ loadWeatherCards(); activateMetricCard('weather','temp'); } if(airLoaded){ loadAirCards(); activateMetricCard('air','pm2_5'); } refreshMap(); if(document.querySelector('.tab-btn.active')?.dataset.tab==='forecast'){ ensureForecastLoaded(); } }
+
+    function showToast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), 2000); }
+
+    // INIT
+    (async function init(){ updateTime(); loadPanel(); })();
+  </script>
+</body>
+</html>
