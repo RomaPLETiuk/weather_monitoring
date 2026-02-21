@@ -46,6 +46,9 @@
 
     .container{padding: 12px 12px calc(78px + var(--safe-bottom));}
 
+    /* helpers */
+    .hidden{display:none !important}
+
     /* Tab contents */
     .tab-content{display:none}
     .tab-content.active{display:block}
@@ -81,14 +84,15 @@
     #map{height: 360px; border-radius: var(--radius); box-shadow: var(--shadow-sm); position: relative}
 
     /* Pick mode UI */
-    .pick-overlay{position:absolute; left:8px; top:8px; right:8px; display:flex; align-items:center; justify-content:center; gap:8px; padding:8px 10px; background:rgba(255,255,255,.95); border-radius:12px; box-shadow: var(--shadow-sm); font-size:13px}
-    .pick-overlay.hidden{display:none}
-    .crosshair{position:absolute; left:50%; top:50%; width:28px; height:28px; transform:translate(-50%,-50%); pointer-events:none; border:2px solid #1d976c; border-radius:50%}
-    .pick-controls{position:absolute; left:8px; right:8px; bottom:8px; display:flex; gap:8px;}
-    .pick-controls.hidden{display:none}
+    .pick-overlay{position:absolute; left:8px; top:8px; right:8px; display:flex; align-items:center; justify-content:center; gap:8px; padding:8px 10px; background:rgba(255,255,255,.95); border-radius:12px; box-shadow: var(--shadow-sm); font-size:13px; z-index: 1200}
+    .crosshair{position:absolute; left:50%; top:50%; width:28px; height:28px; transform:translate(-50%,-50%); pointer-events:none; border:2px solid #1d976c; border-radius:50%; z-index: 1200}
+    .pick-controls{position:absolute; left:8px; right:8px; bottom:8px; display:flex; gap:8px; z-index:1200}
     .btn{border:none; background:#e8f6ef; color:#0b5138; padding:10px 12px; border-radius:10px; font-weight:600; flex:1}
     .btn.primary{background:#1d976c; color:#fff}
     .btn.danger{background:#fee2e2; color:#991b1b}
+
+    /* Map FAB to enter pick mode */
+    .fab-pick{position:absolute; right:12px; bottom:12px; z-index:1200; border:none; background:#1d976c; color:#fff; padding:10px 14px; border-radius:999px; font-weight:700; box-shadow: var(--shadow)}
 
     /* Bottom Tabs */
     .bottom-tabs{ position: fixed; left:0; right:0; bottom:0; background:#fff; display:flex; justify-content:space-around; gap:2px; padding: 6px 8px calc(6px + var(--safe-bottom)); box-shadow: 0 -6px 18px rgba(0,0,0,0.08); z-index: 10; }
@@ -171,13 +175,14 @@
       <div id="map">
         <!-- pick mode UI -->
         <div id="pickOverlay" class="pick-overlay hidden">Режим вибору локації: пересуньте карту так, щоб потрібна точка була під прицілом</div>
-        <div id="crosshair" class="crosshair" style="display:none"></div>
+        <div id="crosshair" class="crosshair hidden"></div>
         <div id="pickControls" class="pick-controls hidden">
           <button id="btnPickCancel" class="btn danger">✖ Скасувати</button>
           <button id="btnPickConfirm" class="btn primary">✅ Підтвердити</button>
         </div>
+        <button id="btnEnterPick" class="fab-pick">🎯 Обрати локацію</button>
       </div>
-      <div class="hint">Порада: торкнися мапи, щоб підвантажити тайли; в режимі вибору локації працюйте центруванням карти.</div>
+      <div class="hint">Порада: в режимі вибору працюємо центруванням карти під приціл, потім — «Підтвердити».</div>
     </section>
   </div>
 
@@ -295,17 +300,17 @@
         const sunset  = new Date(wNow.sys.sunset*1000 ).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
         const aqi = aNow?.list?.[0]?.main?.aqi ?? 0; const c = aNow?.list?.[0]?.components ?? {};
         panelCards.innerHTML = `
-          <div class=\"card\"><div class=\"label\">🌡 Температура</div><div class=\"value\">${safe(wNow.main?.temp)} °C • відч: ${safe(wNow.main?.feels_like)} °C</div></div>
-          <div class=\"card\"><div class=\"label\">💧 Вологість</div><div class=\"value\">${safe(wNow.main?.humidity)} %</div></div>
-          <div class=\"card\"><div class=\"label\">🌬 Вітер</div><div class=\"value\">${safe(wNow.wind?.speed)} м/с</div></div>
-          <div class=\"card\"><div class=\"label\">🔽 Тиск</div><div class=\"value\">${safe(wNow.main?.pressure)} гПа</div></div>
-          <div class=\"card\"><div class=\"label\">🌤 Опис</div><div class=\"value\">${safe(wNow.weather?.[0]?.description)}</div></div>
-          <div class=\"card\"><div class=\"label\">🌅 Схід / Захід</div><div class=\"value\">${sunrise} / ${sunset}</div></div>
-          <div class=\"card ${aqiClass(aqi)}\"><div class=\"label\">🟢 Індекс якості повітря</div><div class=\"value\">${aqiText(aqi)} (${aqi})</div></div>
-          <div class=\"card\"><div class=\"label\">PM2.5</div><div class=\"value\">${safe(c.pm2_5)} μг/м³</div></div>
-          <div class=\"card\"><div class=\"label\">PM10</div><div class=\"value\">${safe(c.pm10)} μг/м³</div></div>`;
+          <div class="card"><div class="label">🌡 Температура</div><div class="value">${safe(wNow.main?.temp)} °C • відч: ${safe(wNow.main?.feels_like)} °C</div></div>
+          <div class="card"><div class="label">💧 Вологість</div><div class="value">${safe(wNow.main?.humidity)} %</div></div>
+          <div class="card"><div class="label">🌬 Вітер</div><div class="value">${safe(wNow.wind?.speed)} м/с</div></div>
+          <div class="card"><div class="label">🔽 Тиск</div><div class="value">${safe(wNow.main?.pressure)} гПа</div></div>
+          <div class="card"><div class="label">🌤 Опис</div><div class="value">${safe(wNow.weather?.[0]?.description)}</div></div>
+          <div class="card"><div class="label">🌅 Схід / Захід</div><div class="value">${sunrise} / ${sunset}</div></div>
+          <div class="card ${aqiClass(aqi)}"><div class="label">🟢 Індекс якості повітря</div><div class="value">${aqiText(aqi)} (${aqi})</div></div>
+          <div class="card"><div class="label">PM2.5</div><div class="value">${safe(c.pm2_5)} μг/м³</div></div>
+          <div class="card"><div class="label">PM10</div><div class="value">${safe(c.pm10)} μг/м³</div></div>`;
         updateTime();
-      }catch(e){ panelCards.innerHTML = `<div class=\"card\">Помилка: ${e.message}</div>`; }
+      }catch(e){ panelCards.innerHTML = `<div class="card">Помилка: ${e.message}</div>`; }
     }
 
     // Weather
@@ -317,14 +322,14 @@
         const sunrise = new Date(w.sys.sunrise*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
         const sunset  = new Date(w.sys.sunset*1000 ).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
         weatherCards.innerHTML = `
-          <div class=\"card metric-card\" data-group=\"weather\" data-metric=\"temp\"><div class=\"label\">🌡 Температура</div><div class=\"value\">${safe(w.main?.temp)} °C • відч: ${safe(w.main?.feels_like)} °C</div></div>
-          <div class=\"card metric-card\" data-group=\"weather\" data-metric=\"humidity\"><div class=\"label\">💧 Вологість</div><div class=\"value\">${safe(w.main?.humidity)} %</div></div>
-          <div class=\"card metric-card\" data-group=\"weather\" data-metric=\"pressure\"><div class=\"label\">🔽 Тиск</div><div class=\"value\">${safe(w.main?.pressure)} гПа</div></div>
-          <div class=\"card metric-card\" data-group=\"weather\" data-metric=\"wind\"><div class=\"label\">🌬 Вітер</div><div class=\"value\">${safe(w.wind?.speed)} м/с</div></div>
-          <div class=\"card metric-card\" data-group=\"weather\" data-metric=\"clouds\"><div class=\"label\">☁️ Хмарність</div><div class=\"value\">${safe(w.clouds?.all)} %</div></div>
-          <div class=\"card\"><div class=\"label\">🌅 Схід / Захід</div><div class=\"value\">${sunrise} / ${sunset}</div></div>`;
+          <div class="card metric-card" data-group="weather" data-metric="temp"><div class="label">🌡 Температура</div><div class="value">${safe(w.main?.temp)} °C • відч: ${safe(w.main?.feels_like)} °C</div></div>
+          <div class="card metric-card" data-group="weather" data-metric="humidity"><div class="label">💧 Вологість</div><div class="value">${safe(w.main?.humidity)} %</div></div>
+          <div class="card metric-card" data-group="weather" data-metric="pressure"><div class="label">🔽 Тиск</div><div class="value">${safe(w.main?.pressure)} гПа</div></div>
+          <div class="card metric-card" data-group="weather" data-metric="wind"><div class="label">🌬 Вітер</div><div class="value">${safe(w.wind?.speed)} м/с</div></div>
+          <div class="card metric-card" data-group="weather" data-metric="clouds"><div class="label">☁️ Хмарність</div><div class="value">${safe(w.clouds?.all)} %</div></div>
+          <div class="card"><div class="label">🌅 Схід / Захід</div><div class="value">${sunrise} / ${sunset}</div></div>`;
         attachMetricCardClicks();
-      }catch(e){ weatherCards.innerHTML = `<div class=\"card\">Помилка: ${e.message}</div>`; }
+      }catch(e){ weatherCards.innerHTML = `<div class="card">Помилка: ${e.message}</div>`; }
     }
 
     async function renderWeatherMetric(metricKey){
@@ -380,8 +385,8 @@
           return { pretty, icon, desc, tmin:Math.round(tmin), tmax:Math.round(tmax), humAvg, windMax:+windMax.toFixed(1), popMax, precip };
         });
         forecastCards.innerHTML = days.map(d=>`
-          <div class=\"card day-card\" title=\"${d.desc}\"> <div class=\"value\">${d.pretty}</div> <img class=\"wx-icon\" alt=\"ico\" src=\"https://openweathermap.org/img/wn/${d.icon}@2x.png\"/> <div class=\"temp-range\">${d.tmax}° / ${d.tmin}°C</div> <div style=\"text-transform:capitalize; color:var(--muted); font-size:12px;\">${d.desc}</div> <div class=\"meta\"> <div>💧 ${d.humAvg}%</div> <div>🌬 ${d.windMax} м/с</div> <div>🌧️ ${d.popMax}%</div> <div>☔ ${d.precip} мм</div> </div> </div>`).join('');
-      }catch(e){ forecastCards.innerHTML = `<div class=\"card day-card\">Не вдалося завантажити прогноз: ${e.message}</div>`; }
+          <div class="card day-card" title="${d.desc}"> <div class="value">${d.pretty}</div> <img class="wx-icon" alt="ico" src="https://openweathermap.org/img/wn/${d.icon}@2x.png"/> <div class="temp-range">${d.tmax}° / ${d.tmin}°C</div> <div style="text-transform:capitalize; color:var(--muted); font-size:12px;">${d.desc}</div> <div class="meta"> <div>💧 ${d.humAvg}%</div> <div>🌬 ${d.windMax} м/с</div> <div>🌧️ ${d.popMax}%</div> <div>☔ ${d.precip} мм</div> </div> </div>`).join('');
+      }catch(e){ forecastCards.innerHTML = `<div class="card day-card">Не вдалося завантажити прогноз: ${e.message}</div>`; }
     }
 
     // Air
@@ -391,16 +396,16 @@
       try{
         const d = await getAirNow(); const aqi = d?.list?.[0]?.main?.aqi ?? 0; const c = d?.list?.[0]?.components ?? {};
         airCards.innerHTML = `
-          <div class=\"card metric-card ${aqiClass(aqi)}\" data-group=\"air\" data-metric=\"aqi\"><div class=\"label\">🟢 Індекс якості повітря</div><div class=\"value\">${aqiText(aqi)} (${aqi})</div></div>
-          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"pm2_5\"><div class=\"label\">PM2.5</div><div class=\"value\">${safe(c.pm2_5)} μг/м³</div></div>
-          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"pm10\"><div class=\"label\">PM10</div><div class=\"value\">${safe(c.pm10)} μг/м³</div></div>
-          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"no2\"><div class=\"label\">NO₂</div><div class=\"value\">${safe(c.no2)} μг/м³</div></div>
-          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"o3\"><div class=\"label\">O₃</div><div class=\"value\">${safe(c.o3)} μг/м³</div></div>
-          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"so2\"><div class=\"label\">SO₂</div><div class=\"value\">${safe(c.so2)} μг/м³</div></div>
-          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"co\"><div class=\"label\">CO</div><div class=\"value\">${safe(c.co)} μг/м³</div></div>
-          <div class=\"card metric-card\" data-group=\"air\" data-metric=\"nh3\"><div class=\"label\">NH₃</div><div class=\"value\">${safe(c.nh3)} μг/м³</div></div>`;
+          <div class="card metric-card ${aqiClass(aqi)}" data-group="air" data-metric="aqi"><div class="label">🟢 Індекс якості повітря</div><div class="value">${aqiText(aqi)} (${aqi})</div></div>
+          <div class="card metric-card" data-group="air" data-metric="pm2_5"><div class="label">PM2.5</div><div class="value">${safe(c.pm2_5)} μг/м³</div></div>
+          <div class="card metric-card" data-group="air" data-metric="pm10"><div class="label">PM10</div><div class="value">${safe(c.pm10)} μг/м³</div></div>
+          <div class="card metric-card" data-group="air" data-metric="no2"><div class="label">NO₂</div><div class="value">${safe(c.no2)} μг/м³</div></div>
+          <div class="card metric-card" data-group="air" data-metric="o3"><div class="label">O₃</div><div class="value">${safe(c.o3)} μг/м³</div></div>
+          <div class="card metric-card" data-group="air" data-metric="so2"><div class="label">SO₂</div><div class="value">${safe(c.so2)} μг/м³</div></div>
+          <div class="card metric-card" data-group="air" data-metric="co"><div class="label">CO</div><div class="value">${safe(c.co)} μг/м³</div></div>
+          <div class="card metric-card" data-group="air" data-metric="nh3"><div class="label">NH₃</div><div class="value">${safe(c.nh3)} μг/м³</div></div>`;
         attachMetricCardClicks();
-      }catch(e){ airCards.innerHTML = `<div class=\"card\">Помилка: ${e.message}</div>`; }
+      }catch(e){ airCards.innerHTML = `<div class="card">Помилка: ${e.message}</div>`; }
     }
 
     async function renderAirMetric(metricKey){
@@ -427,6 +432,7 @@
     const pickControls = document.getElementById('pickControls');
     const btnPickConfirm = document.getElementById('btnPickConfirm');
     const btnPickCancel = document.getElementById('btnPickCancel');
+    const btnEnterPick = document.getElementById('btnEnterPick');
 
     function ensureMapLoaded(){
       if(!mapInitialized){
@@ -441,17 +447,16 @@
 
     function enterPickMode(){
       if(!mapInitialized) ensureMapLoaded();
-      picking = true; pickOverlay.classList.remove('hidden'); pickControls.classList.remove('hidden'); crosshair.style.display='block';
+      picking = true; pickOverlay.classList.remove('hidden'); pickControls.classList.remove('hidden'); crosshair.classList.remove('hidden'); btnEnterPick.classList.add('hidden');
       if(mainMarker){ mainMarker.remove(); mainMarker=null; }
     }
-    function exitPickMode(){ picking=false; pickOverlay.classList.add('hidden'); pickControls.classList.add('hidden'); crosshair.style.display='none'; if(!mainMarker){ mainMarker = L.marker([lat,lon]).addTo(mapInstance).bindPopup(placeName); }
-      // show updated marker
+    function exitPickMode(){ picking=false; pickOverlay.classList.add('hidden'); pickControls.classList.add('hidden'); crosshair.classList.add('hidden'); btnEnterPick.classList.remove('hidden'); if(!mainMarker){ mainMarker = L.marker([lat,lon]).addTo(mapInstance).bindPopup(placeName); }
       refreshMap();
     }
 
-    btnPickConfirm.addEventListener('click', ()=>{
-      if(!mapInstance) return; const center = mapInstance.getCenter(); setLocation(center.lat, center.lng, 'Вибрана точка'); showToast('Локацію оновлено'); exitPickMode(); });
+    btnPickConfirm.addEventListener('click', ()=>{ if(!mapInstance) return; const center = mapInstance.getCenter(); setLocation(center.lat, center.lng, 'Вибрана точка'); showToast('Локацію оновлено'); exitPickMode(); });
     btnPickCancel.addEventListener('click', ()=>{ exitPickMode(); });
+    btnEnterPick.addEventListener('click', ()=>{ enterPickMode(); });
 
     // Header button → jump to map and enter pick mode
     document.getElementById('btnChangeLoc').addEventListener('click', ()=>{ switchToTab('map'); ensureMapLoaded(); enterPickMode(); });
